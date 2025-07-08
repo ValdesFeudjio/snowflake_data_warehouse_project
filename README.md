@@ -35,3 +35,7 @@ This project is licensed under the MIT License. You are free to use, modify, and
 
 ## 🌟 About Me
 Hi there! I'm **Valdes Feudjio**. I’m Data Scientist & Business Intelligence Engineer with experience in building scoring models, designing data pipeline and dashboards, and leveraging large-scale data to drive marketing and sales strategies. Skilled in SQL, Python, Snowflake, and data visualization tools. Passionate about translating complex data into actionable insights that create business value.
+
+
+--- 
+je suis la je travaille
