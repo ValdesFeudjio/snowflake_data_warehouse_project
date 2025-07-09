@@ -18,3 +18,5 @@ use database DWH_RETAIL;
 create or replace schema bronze;
 create or replace schema silver;
 create or replace schema gold;
+
+
