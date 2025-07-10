@@ -22,6 +22,7 @@ create or replace schema gold;
 
 
 --- cretation des tables de la zone bronze
+-- cas de  la table CRM
 
 create table bronze.crm_cust_info(
     cst_id int,
@@ -57,4 +58,34 @@ create table bronze.crm_sales_details(
     sls_quantity int,
     sls_price int
 );
+
+-- cas de  la table ERP
+
+
+create table bronze.erp_cust_az12(
+    
+    cid varchar(50),
+    bdate date,
+    gen varchar(20)
+);
+
+
+create table bronze.erp_loc_a101(
+    
+    cid varchar(50),
+    cntry varchar(20)
+);
+
+
+
+create table bronze.erp_cat_g1v2(
+    
+id varchar(50),
+cat varchar(50),
+subcat varchar(50),
+maintenance varchar(50)
+);
+
+
+
 
