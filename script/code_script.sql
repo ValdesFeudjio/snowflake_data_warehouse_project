@@ -36,6 +36,9 @@ create table bronze.crm_cust_info(
 
 
 
+
+
+
 create table bronze.crm_prd_info(
     prd_id int,
     prd_key varchar(25),
@@ -85,6 +88,16 @@ cat varchar(50),
 subcat varchar(50),
 maintenance varchar(50)
 );
+
+
+-- je fais une intégration snowflake
+
+CREATE OR REPLACE STORAGE INTEGRATION s3_int_retail
+  TYPE = EXTERNAL_STAGE
+  STORAGE_PROVIDER = S3
+  ENABLED = TRUE
+  STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::<TON_ACCOUNT_ID>:role/snowflake-retail-role'
+  STORAGE_ALLOWED_LOCATIONS = ('s3://retail-bucket-dwh/');
 
 
 
