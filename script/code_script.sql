@@ -41,10 +41,10 @@ create table bronze.crm_cust_info(
 
 create table bronze.crm_prd_info(
     prd_id int,
-    prd_key varchar(25),
-    prd_nm varchar(25),
+    prd_key varchar(50),
+    prd_nm varchar(50),
     prd_cost int,
-    prd_line varchar(25),
+    prd_line varchar(50),
     prd_start_dt date,
     prd_end_dt date
 );
@@ -91,6 +91,9 @@ maintenance varchar(50)
 
 
 
+
+
+
 /*
 -- je fais une intégration snowflake apres avoir crée le role i am sur AWS
 */
@@ -116,10 +119,11 @@ CREATE OR REPLACE STAGE stage_retail_crm
   URL = 's3://retail-bucket-dwh/CRM/'
   FILE_FORMAT = (TYPE = 'CSV');
 
+--drop stage stage_retail_erp;
 
 CREATE OR REPLACE STAGE stage_retail_erp
   STORAGE_INTEGRATION = s3_int_retail
-  URL = 's3://retail-bucket-dwh/CRM/'
+  URL = 's3://retail-bucket-dwh/ERP/'
   FILE_FORMAT = (TYPE = 'CSV');
 
 
@@ -128,3 +132,42 @@ LIST @stage_retail_erp;
 
 
 
+
+
+-- je charge les fichiers du stage dans les TABLES
+
+
+
+COPY INTO DWH_RETAIL.BRONZE.CRM_CUST_INFO
+FROM @DWH_RETAIL.BRONZE.STAGE_RETAIL_CRM/cust_info.csv
+FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
+
+
+
+COPY INTO DWH_RETAIL.BRONZE.CRM_PRD_INFO
+FROM @DWH_RETAIL.BRONZE.STAGE_RETAIL_CRM/prd_info.csv
+FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
+
+
+
+COPY INTO DWH_RETAIL.BRONZE.CRM_SALES_DETAILS
+FROM @DWH_RETAIL.BRONZE.STAGE_RETAIL_CRM/sales_details.csv
+FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
+
+/* CAS DES FICHIERS QUI SE TROUVENT DANS L'ERP*/
+
+
+
+COPY INTO DWH_RETAIL.BRONZE.ERP_CAT_G1V2
+FROM @DWH_RETAIL.BRONZE.STAGE_RETAIL_ERP/PX_CAT_G1V2.csv
+FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
+
+
+COPY INTO DWH_RETAIL.BRONZE.ERP_CUST_AZ12
+FROM @DWH_RETAIL.BRONZE.STAGE_RETAIL_ERP/CUST_AZ12.csv
+FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
+
+
+COPY INTO DWH_RETAIL.BRONZE.erp_loc_a101
+FROM @DWH_RETAIL.BRONZE.STAGE_RETAIL_ERP/LOC_A101.csv
+FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
