@@ -237,16 +237,68 @@ END;
 $$;
 
 
--- execution des procedures de d'ingestion crm
 
-CALL DWH_RETAIL.BRONZE.LOAD_CRM_CUST_INFO();
-CALL DWH_RETAIL.BRONZE.LOAD_CRM_PRD_INFO();
-CALL DWH_RETAIL.BRONZE.LOAD_CRM_SALES_DETAILS();
 
--- execution des procedures de d'ingestion erp
+-- Procedure globlale de l'ingestion des 6 tables 
+CREATE OR REPLACE PROCEDURE DWH_RETAIL.BRONZE.SP_LOAD_ALL_DATA()
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+BEGIN
+  -- CRM
+  CALL DWH_RETAIL.BRONZE.LOAD_CRM_CUST_INFO();
+  CALL DWH_RETAIL.BRONZE.LOAD_CRM_PRD_INFO();
+  CALL DWH_RETAIL.BRONZE.LOAD_CRM_SALES_DETAILS();
 
-CALL DWH_RETAIL.BRONZE.LOAD_ERP_CAT_G1V2();
-CALL DWH_RETAIL.BRONZE.LOAD_ERP_CUST_AZ12();
-CALL DWH_RETAIL.BRONZE.LOAD_ERP_LOC_A101();
+  -- ERP
+  CALL DWH_RETAIL.BRONZE.LOAD_ERP_CAT_G1V2();
+  CALL DWH_RETAIL.BRONZE.LOAD_ERP_CUST_AZ12();
+  CALL DWH_RETAIL.BRONZE.LOAD_ERP_LOC_A101();
+
+  RETURN 'Tous les chargements ont été effectués avec succès.';
+END;
+$$;
+
+
+-- creation de la taches qui va appeler la procedure chaque jour à 6h
+CREATE OR REPLACE TASK DWH_RETAIL.BRONZE.TASK_DAILY_LOAD
+  WAREHOUSE = COMPUTE_WH -- remplace par le nom de ton warehouse
+  SCHEDULE = 'USING CRON 0 4 * * * UTC' -- tous les jours à 4h UTC = 6h Paris
+AS
+CALL DWH_RETAIL.BRONZE.SP_LOAD_ALL_DATA();
+
+-- j'active la tache 
+
+ALTER TASK DWH_RETAIL.BRONZE.TASK_DAILY_LOAD RESUME;
+
+
+
+-- je met mon mail pour que la tache puisse me notifier de la fin du chargement de fichiers 
+
+CREATE NOTIFICATION INTEGRATION email_alerts
+  TYPE = EMAIL
+  ENABLED = TRUE
+  ALLOWED_RECIPIENTS = ('valdesfeudjio@gmail.com');
+
+
+CREATE OR REPLACE PROCEDURE DWH_RETAIL.BRONZE.SP_NOTIFY_LOAD_SUCCESS()
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+BEGIN
+  CALL SYSTEM$SEND_EMAIL(
+    'Bronze layer intergration', -- nom de l’intégration
+    'valdesfeudjio@gmail.com',
+    '✅ Chargement DWH terminé',
+    'Tous les fichiers CRM et ERP ont été chargés avec succès.'
+  );
+
+  RETURN 'Notification envoyée';
+END;
+$$;
+
+
 
 
