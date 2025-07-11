@@ -90,15 +90,41 @@ maintenance varchar(50)
 );
 
 
--- je fais une intégration snowflake
+
+/*
+-- je fais une intégration snowflake apres avoir crée le role i am sur AWS
+*/
 
 CREATE OR REPLACE STORAGE INTEGRATION s3_int_retail
   TYPE = EXTERNAL_STAGE
   STORAGE_PROVIDER = S3
   ENABLED = TRUE
-  STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::<TON_ACCOUNT_ID>:role/snowflake-retail-role'
+  STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::115181208395:role/snowflake--retail-role'
   STORAGE_ALLOWED_LOCATIONS = ('s3://retail-bucket-dwh/');
 
+
+desc integration s3_int_retail;
+
+
+create or replace file format retail_format
+FIELD_DELIMITER = ','; 
+
+
+
+CREATE OR REPLACE STAGE stage_retail_crm
+  STORAGE_INTEGRATION = s3_int_retail
+  URL = 's3://retail-bucket-dwh/CRM/'
+  FILE_FORMAT = (TYPE = 'CSV');
+
+
+CREATE OR REPLACE STAGE stage_retail_erp
+  STORAGE_INTEGRATION = s3_int_retail
+  URL = 's3://retail-bucket-dwh/CRM/'
+  FILE_FORMAT = (TYPE = 'CSV');
+
+
+LIST @stage_retail_crm;
+LIST @stage_retail_erp;
 
 
 
