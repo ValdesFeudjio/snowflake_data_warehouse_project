@@ -1,74 +1,5 @@
-
-
---- cretation des tables de la zone silver
--- cas de  la table CRM
-
-create table silver.crm_cust_info(
-    cst_id int,
-    cst_key varchar(25),
-    cst_firstname varchar(30),
-    cst_lastname varchar(30),
-    cst_marital_status varchar(30),
-    cst_gndr varchar(30),
-    cst_create_date date
-);
-
-
-create table silver.crm_prd_info(
-    prd_id int,
-    prd_key varchar(50),
-    prd_nm varchar(50),
-    prd_cost int,
-    prd_line varchar(50),
-    prd_start_dt date,
-    prd_end_dt date
-);
-
-
-create table silver.crm_sales_details(
-    sls_ord_num varchar(25),
-    sls_prd_key varchar(25),
-    sls_cust_id int,
-    sls_order_dt int,
-    sls_ship_dt int,
-    sls_due_dt int,
-    sls_sales int,
-    sls_quantity int,
-    sls_price int
-);
-
-
-
--- cas de  la table ERP
-
-
-create table silver.erp_cust_az12(
-    
-    cid varchar(50),
-    bdate date,
-    gen varchar(20)
-);
-
-
-create table silver.erp_loc_a101(
-    
-    cid varchar(50),
-    cntry varchar(20)
-);
-
-
-
-create table silver.erp_cat_g1v2(
-    
-id varchar(50),
-cat varchar(50),
-subcat varchar(50),
-maintenance varchar(50)
-);
-
-
 /*
-Traitement de la base de données silver
+Feuille de test
 */
 -- Cas de la table crm_cust_info
 
@@ -92,6 +23,13 @@ select *,
        row_number() over(partition by cst_id order by cst_create_date desc) as flag_last
 from bronze.crm_cust_info)
 where flag_last=1;
+
+
+-- verification du formatage des noms et des prenoms
+
+select cst_gndr
+from bronze.crm_cust_info
+Where cst_gndr != trim(cst_gndr); -- ici trim permet de supprimer les espaces en début et en fin des expressions
 
 
 
