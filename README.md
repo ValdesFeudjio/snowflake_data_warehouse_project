@@ -65,6 +65,9 @@ Develop a modern data warehouse using SQL Server to consolidate sales data, enab
 - **Scope** : Focus on the latest dataset only; historization of data is not required.
 - **Documentation** : Provide clear documentation of the data model to support both business stakeholders and analytics teams.
 
+![model integration](https://github.com/user-attachments/assets/be3b0639-197c-4464-92ab-16d2c49fca49)
+
+
 ---
 ### BI: Analytics & Reporting (Data Analysis)
 #### Objective
