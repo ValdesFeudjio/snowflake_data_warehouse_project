@@ -320,9 +320,9 @@ END;
 $$;
 
 
+/* Cas de la table erp_cat_g1v2 de silver*/
 
 
-/* Procedure globale pour l'execution des procedure precedentes*/
 
 
 CREATE OR REPLACE PROCEDURE silver.SP_LOAD_ERP_CAT_G1V2()
@@ -342,7 +342,7 @@ END;
 $$;
 
 
-
+/* Procedure globale pour l'execution des 6 procedures precedentes*/
 
 
 CREATE OR REPLACE PROCEDURE silver.SP_LOAD_ALL_SILVER()
