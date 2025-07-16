@@ -5,6 +5,9 @@ Feuille de test
 
 --check for nulls or duplicates in primary key
 
+/*
+si les valeur sont duppliquées, nous allons garder uniquement les infos les plus recentes par client
+*/
 select cst_id,
        count(*) as nombre
 from bronze.crm_cust_info
@@ -27,6 +30,10 @@ where flag_last=1;
 
 -- verification du formatage des noms et des prenoms
 
+/*
+Nous allons utiliser trim pour mettre en forme les noms et les prenom
+*/
+
 select cst_gndr
 from bronze.crm_cust_info
 Where cst_gndr != trim(cst_gndr); -- ici trim permet de supprimer les espaces en début et en fin des expressions
@@ -34,285 +41,113 @@ Where cst_gndr != trim(cst_gndr); -- ici trim permet de supprimer les espaces en
 
 
 
+/*
+On regarde la colonne status marital et genre 
+*/
 
+select distinct cst_gndr
+from bronze.crm_cust_info;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+select distinct cst_marital_status
+from bronze.crm_cust_info;
 
 
 
 /*
--- je fais une intégration snowflake apres avoir crée le role i am sur AWS
+on regarde la table qui donne les informations sur le produit
 */
 
-CREATE OR REPLACE STORAGE INTEGRATION s3_int_retail
-  TYPE = EXTERNAL_STAGE
-  STORAGE_PROVIDER = S3
-  ENABLED = TRUE
-  STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::115181208395:role/snowflake--retail-role'
-  STORAGE_ALLOWED_LOCATIONS = ('s3://retail-bucket-dwh/');
+-- valeur dupliquée pour id du produit
+select prd_id,
+       count(*) as nombre
+from bronze.crm_prd_info
+group by prd_id
+having nombre>1  or prd_id is null ;
 
+-- valeur dupliquée pour key du produit
+select prd_key,
+       count(*) as nombre
+from bronze.crm_prd_info
+group by prd_key
+having nombre>1  or prd_key is null ;
 
-desc integration s3_int_retail;
+--
 
+select
+prd_id,
+prd_key,
+replace (substr(prd_key,1,5),'-','_') as cat_id,
+substr(prd_key, 7, length(prd_key)) as prd_key,
+prd_nm,
+prd_cost,
+prd_line,
+prd_start_dt,
+prd_end_dt
+from bronze.crm_prd_info;
 
-create or replace file format retail_format
-FIELD_DELIMITER = ','; 
 
 
+select prd_nm
+from bronze.crm_prd_info
+where prd_nm != trim(prd_nm);
 
-CREATE OR REPLACE STAGE stage_retail_crm
-  STORAGE_INTEGRATION = s3_int_retail
-  URL = 's3://retail-bucket-dwh/CRM/'
-  FILE_FORMAT = (TYPE = 'CSV');
 
---drop stage stage_retail_erp;
+select prd_cost
+from bronze.crm_prd_info
+where prd_cost < 0 or prd_cost is null; 
 
-CREATE OR REPLACE STAGE stage_retail_erp
-  STORAGE_INTEGRATION = s3_int_retail
-  URL = 's3://retail-bucket-dwh/ERP/'
-  FILE_FORMAT = (TYPE = 'CSV');
 
+select distinct prd_line
+from bronze.crm_prd_info;
 
-LIST @stage_retail_crm;
-LIST @stage_retail_erp;
+-- traitment des dates 
+select *
+from bronze.crm_prd_info
+where prd_end_dt<prd_start_dt;
 
 
-
-
-
--- je charge les fichiers du stage dans les TABLES
-
--- cas de crm
 
+select
+prd_id,
+prd_key,
+prd_nm,
+prd_start_dt,
+prd_end_dt,
+lead(prd_start_dt) over (partition by prd_key order by prd_start_dt)-1 as prd_end_dt_test
+from bronze.crm_prd_info
+where prd_key in ('AC-HE-HL-U509-R','AC-HE-HL-U509');
 
--- infos sur le customer
-CREATE OR REPLACE PROCEDURE DWH_RETAIL.BRONZE.LOAD_CRM_CUST_INFO()
-RETURNS STRING
-LANGUAGE SQL
-AS
-$$
-BEGIN
-    COPY INTO DWH_RETAIL.BRONZE.CRM_CUST_INFO
-    FROM @DWH_RETAIL.BRONZE.STAGE_RETAIL_CRM/cust_info.csv
-    FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
-    
-    RETURN 'Data loaded successfully';
-END;
-$$;
 
 
--- infos sur le produit
-CREATE OR REPLACE PROCEDURE DWH_RETAIL.BRONZE.LOAD_CRM_PRD_INFO()
-RETURNS STRING
-LANGUAGE SQL
-AS
-$$
-BEGIN
-    COPY INTO DWH_RETAIL.BRONZE.CRM_PRD_INFO
-    FROM @DWH_RETAIL.BRONZE.STAGE_RETAIL_CRM/prd_info.csv
-    FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
-    
-    RETURN 'Data loaded successfully';
-END;
-$$;
 
 
--- details des ventes
-CREATE OR REPLACE PROCEDURE DWH_RETAIL.BRONZE.LOAD_CRM_SALES_DETAILS()
-RETURNS STRING
-LANGUAGE SQL
-AS
-$$
-BEGIN
-    COPY INTO DWH_RETAIL.BRONZE.CRM_SALES_DETAILS
-    FROM @DWH_RETAIL.BRONZE.STAGE_RETAIL_CRM/sales_details.csv
-    FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
-    
-    RETURN 'Data loaded successfully';
-END;
-$$;
-
-
-
-
--- cas de erp
 
-CREATE OR REPLACE PROCEDURE DWH_RETAIL.BRONZE.LOAD_ERP_CAT_G1V2()
-RETURNS STRING
-LANGUAGE SQL
-AS
-$$
-BEGIN
-    COPY INTO DWH_RETAIL.BRONZE.ERP_CAT_G1V2
-    FROM @DWH_RETAIL.BRONZE.STAGE_RETAIL_ERP/PX_CAT_G1V2.csv
-    FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
-    
-    RETURN 'Data loaded successfully';
-END;
-$$;
-
-
-CREATE OR REPLACE PROCEDURE DWH_RETAIL.BRONZE.LOAD_ERP_CUST_AZ12()
-RETURNS STRING
-LANGUAGE SQL
-AS
-$$
-BEGIN
-    COPY INTO DWH_RETAIL.BRONZE.ERP_CUST_AZ12
-    FROM @DWH_RETAIL.BRONZE.STAGE_RETAIL_ERP/CUST_AZ12.csv
-    FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
-    
-    RETURN 'Data loaded successfully';
-END;
-$$;
-
-
-
-CREATE OR REPLACE PROCEDURE DWH_RETAIL.BRONZE.LOAD_ERP_LOC_A101()
-RETURNS STRING
-LANGUAGE SQL
-AS
-$$
-BEGIN
-    COPY INTO DWH_RETAIL.BRONZE.ERP_LOC_A101
-    FROM @DWH_RETAIL.BRONZE.STAGE_RETAIL_ERP/LOC_A101.csv
-    FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
-    
-    RETURN 'Data loaded successfully';
-END;
-$$;
-
-
-
-
--- Procedure globlale de l'ingestion des 6 tables 
-
--- Étape 1 : Création de l'intégration email pour autoriser l'envoi de mails
-GRANT CREATE INTEGRATION ON ACCOUNT TO ROLE SYSADMIN;
-
-CREATE NOTIFICATION INTEGRATION email_alerts
-  TYPE = EMAIL
-  ENABLED = TRUE
-  ALLOWED_RECIPIENTS = ('valdesfeudjio@gmail.com');
-
-
--- Étape 2 : Procédure qui envoie un email en cas de succès de l'ingestion
-CREATE OR REPLACE PROCEDURE DWH_RETAIL.BRONZE.SP_NOTIFY_LOAD_SUCCESS()
-RETURNS STRING
-LANGUAGE SQL
-AS
-$$
-BEGIN
-  CALL SYSTEM$SEND_EMAIL(
-    'email_alerts',  -- Nom de l'intégration définie à l'étape 1
-    'valdesfeudjio@gmail.com',
-    '✅ Succès : Chargement DWH terminé',
-    'Tous les fichiers CRM et ERP ont été chargés avec succès.'
-  );
-
-  RETURN 'Notification de succès envoyée';
-END;
-$$;
-
-
--- Étape 3 : Procédure qui envoie un email si une erreur survient pendant l'ingestion
-CREATE OR REPLACE PROCEDURE DWH_RETAIL.BRONZE.SP_NOTIFY_LOAD_FAILURE(error_message STRING)
-RETURNS STRING
-LANGUAGE SQL
-AS
-$$
-BEGIN
-  CALL SYSTEM$SEND_EMAIL(
-    'email_alerts',
-    'valdesfeudjio@gmail.com',
-    '❌ Échec : Problème de chargement DWH',
-    'Le chargement a échoué avec l’erreur suivante : ' || error_message
-  );
-
-  RETURN 'Notification d’échec envoyée';
-END;
-$$;
-
-
-
-
--- Étape 4 : Procédure globale qui appelle les 6 procédures d'ingestion
--- et déclenche l'envoi du mail de succès ou d'échec
-CREATE OR REPLACE PROCEDURE DWH_RETAIL.BRONZE.SP_LOAD_ALL_DATA()
-RETURNS STRING
-LANGUAGE SQL
-AS
-$$
-DECLARE
-  err_msg STRING;
-BEGIN
-  BEGIN
-    -- CRM
-    CALL DWH_RETAIL.BRONZE.LOAD_CRM_CUST_INFO();
-    CALL DWH_RETAIL.BRONZE.LOAD_CRM_PRD_INFO();
-    CALL DWH_RETAIL.BRONZE.LOAD_CRM_SALES_DETAILS();
-
-    -- ERP
-    CALL DWH_RETAIL.BRONZE.LOAD_ERP_CAT_G1V2();
-    CALL DWH_RETAIL.BRONZE.LOAD_ERP_CUST_AZ12();
-    CALL DWH_RETAIL.BRONZE.LOAD_ERP_LOC_A101();
-
-    -- Success notification
-    CALL DWH_RETAIL.BRONZE.SP_NOTIFY_LOAD_SUCCESS();
-
-    RETURN 'All loads completed successfully.';
-
-  EXCEPTION
-    WHEN OTHER THEN
-      SET err_msg = SQLSTATE || ': ' || SQLERRM;
-      CALL DWH_RETAIL.BRONZE.SP_NOTIFY_LOAD_FAILURE(:err_msg);
-      RETURN 'Error during load: ' || :err_msg;
-  END;
-END;
-$$;
-
-
-
-
--- Étape 5 : Création de la tâche qui exécute la procédure tous les jours à 6h heure de Paris
-CREATE OR REPLACE TASK DWH_RETAIL.BRONZE.TASK_DAILY_LOAD
-  WAREHOUSE = COMPUTE_WH  -- Remplacer si besoin par ton warehouse
-  SCHEDULE = 'USING CRON 0 4 * * * UTC'  -- 6h heure de Paris = 4h UTC
-  COMMENT = 'Tâche quotidienne de chargement CRM/ERP avec notifications'
-AS
-  CALL DWH_RETAIL.BRONZE.SP_LOAD_ALL_DATA();
-
-
-
-
--- Étape 6 : Activation de la tâche planifiée
-
-GRANT EXECUTE TASK ON ACCOUNT TO ROLE SYSADMIN;
-
-ALTER TASK DWH_RETAIL.BRONZE.TASK_DAILY_LOAD RESUME;
-
-DWH_RETAIL.BRONZE.ERP_CAT_G1V2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
