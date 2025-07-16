@@ -1,14 +1,49 @@
-/* 
--------------------------------------------------
- -Creation de la base de données et des schemas- 
--------------------------------------------------
+/******************************************************************************************
+* Nom du fichier  : code_script_bronze.sql
+* Auteur          : Valdes
+* Objectif        : Mettre en place la base de données DWH_RETAIL et la couche BRONZE,
+*                   en créant les schémas, les tables de staging, les intégrations cloud 
+*                   et les procédures d’ingestion des données brutes depuis S3 vers Snowflake.
+*
+* Description     :
+* Ce fichier exécute les actions suivantes :
+*
+* 1. Création de la base de données `DWH_RETAIL` si elle n'existe pas.
+* 2. Création des schémas `bronze`, `silver` et `gold` pour structurer le traitement en couches.
+* 3. Création des tables de la zone `bronze`, correspondant aux données CRM et ERP :
+*       - bronze.crm_cust_info
+*       - bronze.crm_prd_info
+*       - bronze.crm_sales_details
+*       - bronze.erp_cust_az12
+*       - bronze.erp_loc_a101
+*       - bronze.erp_cat_g1v2
+* 4. Mise en place d’une **intégration cloud S3** (`s3_int_retail`) pour charger les fichiers CSV.
+* 5. Création des `stages` externes pour CRM et ERP.
+* 6. Définition de **6 procédures d’ingestion** pour charger les fichiers vers les tables bronze.
+* 7. Création de procédures de **notification email** en cas de succès ou d’échec de chargement.
+* 8. Mise en place d’une **procédure globale `SP_LOAD_ALL_DATA()`** pour tout charger d’un coup.
+* 9. Création d’une **tâche planifiée (`TASK_DAILY_LOAD`)** qui exécute la procédure chaque jour à 6h.
+*
+* Notifications :
+*   - Envoie automatique d’un email à valdesfeudjio@gmail.com après chaque exécution
+*     (succès ou erreur), via l’intégration `email_alerts`.
+*
+* Usage :
+*   - Pour charger manuellement tous les fichiers :
+*       CALL DWH_RETAIL.BRONZE.SP_LOAD_ALL_DATA();
+*
+*   - Pour exécuter une ingestion spécifique (ex : CRM uniquement) :
+*       CALL DWH_RETAIL.BRONZE.LOAD_CRM_CUST_INFO();
+*
+* Dépendances :
+*   - Les fichiers sources doivent être déposés sur S3 aux bons emplacements :
+*       - s3://retail-bucket-dwh/CRM/
+*       - s3://retail-bucket-dwh/ERP/
+*
+* Dernière mise à jour : 
+******************************************************************************************/
 
-Explication :
-    le script ci dessous permet de creer la base de données et DWH_RETAIL en verifiant en amont si elle n'existe pas déjà pour éviter de l'écraser.
-    Additionnelement, le script permet de creer nos 03 schemas qui vont permettre de recvoir les 03 types de données dans notre process de traitement (bonze, silver et gold).
-    
 
-*/
 
 
 
