@@ -226,6 +226,14 @@ select distinct cntry
 from bronze.erp_loc_a101
 order by cntry;
 
+-----------------------------------------------------------------
+
+select 
+id,
+cat,
+subcat,
+maintenance
+from bronze.erp_cat_g1v2
 
 
 

@@ -1,9 +1,53 @@
+/******************************************************************************************
+* Nom du fichier  : load_silver_procedures.sql
+* Auteur          : Valdes
+* Objectif        : Automatiser le traitement et le chargement des données de la couche 
+*                   BRONZE vers la couche SILVER dans Snowflake à l’aide de procédures SQL.
+*
+* Description     :
+* Ce fichier contient 6 procédures stockées, chacune dédiée au traitement et à l’insertion
+* des données dans une table de la couche SILVER. Les transformations incluent :
+*   - Nettoyage des valeurs (TRIM, COALESCE, CASE…)
+*   - Normalisation des formats (genre, statut marital, pays…)
+*   - Filtrage et enrichissement (ROW_NUMBER, LEAD…)
+*   - Conversion de dates (format YYYYMMDD → DATE)
+*
+* Les procédures concernent les tables suivantes :
+*   - silver.crm_cust_info
+*   - silver.crm_prd_info
+*   - silver.crm_sales_details
+*   - silver.erp_cust_az12
+*   - silver.erp_loc_a101
+*   - silver.erp_cat_g1v2
+*
+* Une 7e procédure, appelée SP_LOAD_ALL_SILVER(), appelle l’ensemble des 6 procédures
+* pour faciliter un rechargement complet et centralisé de la couche SILVER.
+*
+* Usage :
+*   - Pour exécuter une procédure spécifique : 
+*       CALL silver.SP_LOAD_CRM_CUST_INFO();
+*
+*   - Pour tout recharger d’un coup :
+*       CALL silver.SP_LOAD_ALL_SILVER();
+*
+* Dépendances :
+*   - Les tables BRONZE doivent être préalablement alimentées.
+*   - Les tables SILVER doivent exister dans le schéma `silver`.
+*
+* Dernière mise à jour 
+******************************************************************************************/
 
+
+
+
+
+
+CALL silver.SP_LOAD_ALL_SILVER(); -- j'execute la procedure globale de chargement des données dans les tables silver
 
 --- cretation des tables de la zone silver
 -- cas de  la table CRM
 
-create table silver.crm_cust_info(
+create table if not exists silver.crm_cust_info(
     cst_id int,
     cst_key varchar(25),
     cst_firstname varchar(30),
@@ -14,7 +58,7 @@ create table silver.crm_cust_info(
 );
 
 --drop table silver.crm_prd_info;
-create table silver.crm_prd_info(
+create table if not exists silver.crm_prd_info(
     prd_id int,
     cat_id varchar(50),
     prd_key varchar(50),
@@ -27,7 +71,7 @@ create table silver.crm_prd_info(
 
 --drop table silver.crm_sales_details;
 
-create table silver.crm_sales_details(
+create table if not exists silver.crm_sales_details(
     sls_ord_num varchar(25),
     sls_prd_key varchar(25),
     sls_cust_id int,
@@ -44,7 +88,7 @@ create table silver.crm_sales_details(
 -- cas de  la table ERP
 
 
-create table silver.erp_cust_az12(
+create table if not exists silver.erp_cust_az12(
     
     cid varchar(50),
     bdate date,
@@ -52,7 +96,7 @@ create table silver.erp_cust_az12(
 );
 
 
-create table silver.erp_loc_a101(
+create table if not exists silver.erp_loc_a101(
     
     cid varchar(50),
     cntry varchar(20)
@@ -60,7 +104,7 @@ create table silver.erp_loc_a101(
 
 
 
-create table silver.erp_cat_g1v2(
+create table if not exists silver.erp_cat_g1v2(
     
 id varchar(50),
 cat varchar(50),
@@ -71,11 +115,13 @@ maintenance varchar(50)
 
 
 
-
-
    -----------------------------------------------------------------
   --------------- TRAITEMENT DES DONNEES SILVER CRM ---------------
 ----------------------------------------------------------------
+
+
+
+
 
 -- Cas de la table crm_cust_info
 
@@ -84,39 +130,46 @@ Les traitements de bases de la table crm_cust_info sont detaillés dans la feuil
 Nous donnons tous les détails sur chaque variable
 */
 
-truncate table silver.crm_cust_info;
 
-insert into silver.crm_cust_info(
+CREATE OR REPLACE PROCEDURE silver.SP_LOAD_CRM_CUST_INFO()
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+BEGIN
+  TRUNCATE TABLE silver.crm_cust_info;
+
+  INSERT INTO silver.crm_cust_info(
+    cst_id, cst_key, cst_firstname, cst_lastname, cst_marital_status, cst_gndr, cst_create_date
+  )
+  SELECT
     cst_id,
     cst_key,
-    cst_firstname,
-    cst_lastname,
-    cst_marital_status,
-    cst_gndr,
+    TRIM(cst_firstname),
+    TRIM(cst_lastname),
+    CASE
+      WHEN UPPER(TRIM(cst_marital_status)) = 'S' THEN 'Single'
+      WHEN UPPER(TRIM(cst_marital_status)) = 'M' THEN 'Married'
+      ELSE 'n/a'
+    END,
+    CASE
+      WHEN UPPER(TRIM(cst_gndr)) = 'F' THEN 'Female'
+      WHEN UPPER(TRIM(cst_gndr)) = 'M' THEN 'Male'
+      ELSE 'n/a'
+    END,
     cst_create_date
-)
+  FROM (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY cst_id ORDER BY cst_create_date DESC) AS flag_last
+    FROM bronze.crm_cust_info
+    WHERE cst_id IS NOT NULL
+  ) t
+  WHERE flag_last = 1;
 
-select cst_id,
-       cst_key,
-       trim(cst_firstname) as cst_firstname,
-       trim(cst_lastname) as cst_lastname,
-        case
-            when upper(trim(cst_marital_status))='S' then 'Single'
-            when upper(trim(cst_marital_status))='M' then 'Married'
-            else 'n/a'
-       end cst_marital_status,  -- normalise marital status values to readable format
-       case
-            when upper(trim(cst_gndr))='F' then 'Female'
-            when upper(trim(cst_gndr))='M' then 'Male'
-            else 'n/a'
-       end cst_gndr,  -- Normalize gender values to readable format
-       cst_create_date
-from (
-select *,
-       row_number() over (partition by cst_id order by cst_create_date desc) as flag_last
-from bronze.crm_cust_info
-where cst_id is not null) t
-where flag_last=1;
+  RETURN 'crm_cust_info loaded';
+END;
+$$;
+
+
 
 
 -- Cas de la table crm_prd_info
@@ -126,34 +179,40 @@ Les traitements de bases de la table crm_prd_info sont detaillés dans la feuill
 Nous donnons tous les détails sur chaque variable
 */
 
+CREATE OR REPLACE PROCEDURE silver.SP_LOAD_CRM_PRD_INFO()
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+BEGIN
+  TRUNCATE TABLE silver.crm_prd_info;
 
-insert into silver.crm_prd_info (
+  INSERT INTO silver.crm_prd_info (
+    prd_id, cat_id, prd_key, prd_nm, prd_cost, prd_line, prd_start_dt, prd_end_dt
+  )
+  SELECT
     prd_id,
-    cat_id,
-    prd_key,
+    REPLACE(SUBSTR(prd_key,1,5),'-','_'),
+    SUBSTR(prd_key, 7, LENGTH(prd_key)),
     prd_nm,
-    prd_cost,
-    prd_line,
+    COALESCE(prd_cost, 0),
+    CASE
+      WHEN UPPER(TRIM(prd_line))='M' THEN 'Mountain'
+      WHEN UPPER(TRIM(prd_line))='R' THEN 'Road'
+      WHEN UPPER(TRIM(prd_line))='S' THEN 'Other Sales'
+      WHEN UPPER(TRIM(prd_line))='T' THEN 'Touring'
+      ELSE 'n/a'
+    END,
     prd_start_dt,
-    prd_end_dt
-)
+    LEAD(prd_start_dt) OVER (PARTITION BY prd_key ORDER BY prd_start_dt) - 1
+  FROM bronze.crm_prd_info;
 
-select
-prd_id,
-replace (substr(prd_key,1,5),'-','_') as cat_id, -- derived new columns
-substr(prd_key, 7, length(prd_key)) as prd_key,
-prd_nm,
-coalesce(prd_cost,0) as prd_cost,
-case
-    when upper(trim(prd_line))='M' then 'Mountain'
-    when upper(trim(prd_line))='R' then 'Road'
-    when upper(trim(prd_line))='S' then 'Other Sales'
-    when upper(trim(prd_line))='T' then 'Touring'
-    else 'n/a'
-end as prd_line,
-prd_start_dt,
-lead(prd_start_dt) over (partition by prd_key order by prd_start_dt)-1 as prd_end_dt
-from bronze.crm_prd_info;
+  RETURN 'crm_prd_info loaded';
+END;
+$$;
+
+
+
 
 
 
@@ -164,53 +223,38 @@ Les traitements de bases de la table crm_prd_info sont detaillés dans la feuill
 Nous donnons tous les détails sur chaque variable
 */
 
+CREATE OR REPLACE PROCEDURE silver.SP_LOAD_CRM_SALES_DETAILS()
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+BEGIN
+  TRUNCATE TABLE silver.crm_sales_details;
+
+  INSERT INTO silver.crm_sales_details (
+    sls_ord_num, sls_prd_key, sls_cust_id, sls_order_dt, sls_ship_dt, sls_due_dt, sls_sales, sls_quantity, sls_price
+  )
+  SELECT
+    sls_ord_num,
+    sls_prd_key,
+    sls_cust_id,
+    CASE WHEN sls_order_dt=0 OR LENGTH(sls_order_dt)!=8 THEN NULL ELSE TO_DATE(TO_VARCHAR(sls_order_dt), 'yyyymmdd') END,
+    CASE WHEN sls_ship_dt=0 OR LENGTH(sls_ship_dt)!=8 THEN NULL ELSE TO_DATE(TO_VARCHAR(sls_ship_dt), 'yyyymmdd') END,
+    CASE WHEN sls_due_dt=0 OR LENGTH(sls_due_dt)!=8 THEN NULL ELSE TO_DATE(TO_VARCHAR(sls_due_dt), 'yyyymmdd') END,
+    CASE WHEN sls_sales IS NULL OR sls_sales <= 0 OR sls_sales != sls_quantity * ABS(sls_price)
+         THEN sls_quantity * ABS(sls_price)
+         ELSE sls_sales END,
+    sls_quantity,
+    CASE WHEN sls_price IS NULL OR sls_price <= 0
+         THEN ROUND(sls_sales / NULLIF(sls_quantity, 0), 0)
+         ELSE ROUND(sls_price, 0) END
+  FROM bronze.crm_sales_details;
+
+  RETURN 'crm_sales_details loaded';
+END;
+$$;
 
 
-insert into silver.crm_sales_details(
-    sls_ord_num ,
-    sls_prd_key ,
-    sls_cust_id ,
-    sls_order_dt ,
-    sls_ship_dt ,
-    sls_due_dt ,
-    sls_sales ,
-    sls_quantity ,
-    sls_price 
-)
-
-SELECT 
-sls_ord_num,
-sls_prd_key,
-sls_cust_id,
-
-case
-    when sls_order_dt=0 or length(sls_order_dt) != 8 then null 
-    else to_date(to_varchar(sls_order_dt), 'yyyymmdd') 
-end as sls_order_dt,
-
-case
-    when sls_ship_dt=0 or length(sls_ship_dt) != 8 then null 
-    else to_date(to_varchar(sls_ship_dt), 'yyyymmdd') 
-end as sls_ship_dt,
-
-case
-    when sls_due_dt=0 or length(sls_due_dt) != 8 then null 
-    else to_date(to_varchar(sls_due_dt), 'yyyymmdd') 
-end as sls_due_dt,
-
-case
-    when sls_sales is null or sls_sales <= 0 or sls_sales!=sls_quantity* abs(sls_price) then sls_quantity*abs(sls_price)
-    else sls_sales
-end sls_sales,
-
-sls_quantity,
-
-case 
-    when sls_price is null or sls_price<=0 then round(sls_sales/nullif(sls_quantity,0),0)
-    else round(sls_price,0)
-end as sls_price 
-
-FROM BRONZE.CRM_SALES_DETAILS;
 
 
 
@@ -221,42 +265,106 @@ FROM BRONZE.CRM_SALES_DETAILS;
 
 /* Cas de la table erp_cust_az12 de silver*/
 
-insert into silver.erp_cust_az12(
-    
-    cid ,
-    bdate ,
-    gen
-)
 
-select 
-case
-    when cid like 'NAS%' then substr(cid,4,length(cid)-3)
-    else cid
-end cid,
+CREATE OR REPLACE PROCEDURE silver.SP_LOAD_ERP_CUST_AZ12()
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+BEGIN
+  TRUNCATE TABLE silver.erp_cust_az12;
 
-case 
-    when bdate>current_date() then null 
-    else bdate
-end as bdate,
-case
-    when upper(trim(gen)) in ('F','FEMALE') then 'Female'
-    when upper(trim(gen)) in ('M','MALE') then 'Male'
-    else 'n/a'
-end as gen
-from bronze.erp_cust_az12;
+  INSERT INTO silver.erp_cust_az12 (cid, bdate, gen)
+  SELECT
+    CASE WHEN cid LIKE 'NAS%' THEN SUBSTR(cid,4,LENGTH(cid)-3) ELSE cid END,
+    CASE WHEN bdate > CURRENT_DATE() THEN NULL ELSE bdate END,
+    CASE
+      WHEN UPPER(TRIM(gen)) IN ('F','FEMALE') THEN 'Female'
+      WHEN UPPER(TRIM(gen)) IN ('M','MALE') THEN 'Male'
+      ELSE 'n/a'
+    END
+  FROM bronze.erp_cust_az12;
+
+  RETURN 'erp_cust_az12 loaded';
+END;
+$$;
 
 
 
-/* Cas de la table erp_loc_a101 de silver*/
+/* Cas de la table erp_loc_101 de silver*/
 
-insert into silver.erp_loc_a101 (cid, cntry)
-select 
-replace(cid,'-') as cid ,
-case 
-    when trim(cntry)='DE' then 'Germany'
-    when trim(cntry) in ('US','USA') then 'United States'
-    when trim(cntry)='' or cntry is null then 'n/a'
-    else trim(cntry)
-end cntry
-from bronze.erp_loc_a101;
+
+
+
+CREATE OR REPLACE PROCEDURE silver.SP_LOAD_ERP_LOC_A101()
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+BEGIN
+  TRUNCATE TABLE silver.erp_loc_a101;
+
+  INSERT INTO silver.erp_loc_a101 (cid, cntry)
+  SELECT
+    REPLACE(cid, '-'),
+    CASE
+      WHEN TRIM(cntry) = 'DE' THEN 'Germany'
+      WHEN TRIM(cntry) IN ('US','USA') THEN 'United States'
+      WHEN TRIM(cntry) = '' OR cntry IS NULL THEN 'n/a'
+      ELSE TRIM(cntry)
+    END
+  FROM bronze.erp_loc_a101;
+
+  RETURN 'erp_loc_a101 loaded';
+END;
+$$;
+
+
+
+
+/* Procedure globale pour l'execution des procedure precedentes*/
+
+
+CREATE OR REPLACE PROCEDURE silver.SP_LOAD_ERP_CAT_G1V2()
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+BEGIN
+  TRUNCATE TABLE silver.erp_cat_g1v2;
+
+  INSERT INTO silver.erp_cat_g1v2 (id, cat, subcat, maintenance)
+  SELECT id, cat, subcat, maintenance
+  FROM bronze.erp_cat_g1v2;
+
+  RETURN 'erp_cat_g1v2 loaded';
+END;
+$$;
+
+
+
+
+
+CREATE OR REPLACE PROCEDURE silver.SP_LOAD_ALL_SILVER()
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+BEGIN
+  CALL silver.SP_LOAD_CRM_CUST_INFO();
+  CALL silver.SP_LOAD_CRM_PRD_INFO();
+  CALL silver.SP_LOAD_CRM_SALES_DETAILS();
+  CALL silver.SP_LOAD_ERP_CUST_AZ12();
+  CALL silver.SP_LOAD_ERP_LOC_A101();
+  CALL silver.SP_LOAD_ERP_CAT_G1V2();
+
+  RETURN 'Toutes les tables silver ont été chargées.';
+END;
+$$;
+
+
+
+
+
+
 
