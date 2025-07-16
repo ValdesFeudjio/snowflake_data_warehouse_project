@@ -175,7 +175,39 @@ or sls_price<=0;
 
 
 
+-- Cas de ERP
 
+/*
+On commence par la table erp_cust_az12 et on s'assure de la bonne qualité des données dans la table 
+*/
+
+
+select 
+case
+    when cid like 'NAS%' then substr(cid,4,length(cid)-3)
+    else cid
+end cid,
+
+case 
+    when bdate>current_date() then null 
+    else bdate
+end as bdate,
+case
+    when upper(trim(gen)) in ('F','FEMALE') then 'Female'
+    when upper(trim(gen)) in ('M','MALE') then 'Male'
+    else 'n/a'
+end as gen
+from bronze.erp_cust_az12;
+
+
+
+select distinct gen,
+case
+    when upper(trim(gen)) in ('F','FEMALE') then 'Female'
+    when upper(trim(gen)) in ('M','MALE') then 'Male'
+    else 'n/a'
+end as gen
+from bronze.erp_cust_az12;
 
 
 
