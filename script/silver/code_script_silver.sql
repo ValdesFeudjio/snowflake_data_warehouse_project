@@ -219,6 +219,8 @@ FROM BRONZE.CRM_SALES_DETAILS;
   --------------- TRAITEMENT DES DONNEES SILVER ERP ---------------
 ----------------------------------------------------------------
 
+/* Cas de la table erp_cust_az12 de silver*/
+
 insert into silver.erp_cust_az12(
     
     cid ,
@@ -242,3 +244,19 @@ case
     else 'n/a'
 end as gen
 from bronze.erp_cust_az12;
+
+
+
+/* Cas de la table erp_loc_a101 de silver*/
+
+insert into silver.erp_loc_a101 (cid, cntry)
+select 
+replace(cid,'-') as cid ,
+case 
+    when trim(cntry)='DE' then 'Germany'
+    when trim(cntry) in ('US','USA') then 'United States'
+    when trim(cntry)='' or cntry is null then 'n/a'
+    else trim(cntry)
+end cntry
+from bronze.erp_loc_a101;
+
